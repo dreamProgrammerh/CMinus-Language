@@ -1,6 +1,5 @@
-#include <stdio.h>
+#include "cli.c"
 
-int main(int argc, char *argv[]) {
-  printf("Hello C-Minus\n");
-  return 0;
+int main(int argc, char **argv) {
+  return cm(argc, argv);
 }

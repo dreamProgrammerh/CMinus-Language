@@ -1,0 +1,13 @@
+{
+  "file_types": {
+    "C": ["C", "H"]
+  },
+  "lsp": {
+    "clangd": {
+      "initialization_options": {
+        "compilationDatabaseCommand": "",
+        "fallbackFlags": ["-Iinclude", "-Isrc/include"]
+      }
+    }
+  }
+}

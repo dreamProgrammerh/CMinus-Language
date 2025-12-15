@@ -1,0 +1,25 @@
+[
+  {
+    "label": "Build & Run",
+    "command": "powershell",
+    "args": ["gcc -Iinclude -Isrc/include src/main.c -o bin/cminus.exe ; if ($LASTEXITCODE -eq 0) { .\\bin\\cminus.exe }"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Build",
+    "command": "gcc",
+    "args": ["-Iinclude", "-Isrc/include", "-o", "bin/cminus.exe", "src/main.c"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Run",
+    "command": ".\\bin\\cminus.exe",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Clean",
+    "command": "powershell",
+    "args": ["Remove-Item -Force -Recurse -ErrorAction SilentlyContinue bin/cminus.exe"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  }
+]
