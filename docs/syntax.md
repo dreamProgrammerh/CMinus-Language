@@ -368,25 +368,30 @@ if not (file.exists()) {
 ```c
 // Basic switch
 switch (value) {
-case 1:
-    println("One");
-    break;
-case 2..5:
-    println("Two to five");
-    break;
-default:
-    println("Other");
+    case 1:
+        println("One");
+        break;
+    case 2..5:
+        println("Two to five");
+        break;
+    default:
+        println("Other");
 }
 
 // Enum shorthand
-enum Color { Red, Green, Blue }
+enum Color { Red, Green, Blue, Yellow }
 Color c = Color::Red;
 
 switch: Color (c) {
-case Red:   println("Red");
-case Green: println("Green");
-case Blue:  println("Blue");
-// Exhaustiveness checked
+    case Red    -> println("Red");
+    case Green  -> println("Green");
+    case Blue   -> println("Blue");
+    // arrow `->` used for one liner block
+    // use {} after arrow for multi-line block
+    case Yellow -> {
+        println("Yellow");
+        println("Yellow");
+    }
 }
 ```
 
