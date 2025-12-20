@@ -24,10 +24,10 @@ It **embraces C** and builds on top of it.
 
 ## Important Notes (Please Read)
 
-> **This project is in early design stage**\
-> There is **no compiler yet**\
-> The repository currently focuses on **language design and documentation**\
-> Syntax, features, and rules may evolve
+> 🚧 **This project is in early design stage**\
+> ❎ There is **no compiler yet**\
+> 📄 The repository currently focuses on **language design and documentation**\
+> 🧪 Syntax, features, and rules may evolve
 
 This is also **my first public GitHub repository**.  
 If you notice anything odd, unclear, or poorly structured, please don’t mind --  
@@ -127,10 +127,10 @@ This code is intended to compile into **clean, human-readable C** that any C com
 
 ## Project Status
 
-* Language specification: **in progress**
-* Design discussions: **open**
-* Compiler: **not started**
-* Contributions: **welcome (especially feedback)**
+* 📘 Language specification: **in progress**
+* 🪁 Design discussions: **open**
+* 🛠️ Compiler: **not started**
+* 🤝 Contributions: **welcome (especially feedback)**
 
 If you’re interested in language design, compiler construction, or just better C --
 feel free to explore the docs, open issues, or share thoughts.
@@ -146,3 +146,13 @@ If C is still your tool of choice,
 CMinus aims to make it **less painful, more expressive, and easier to scale**.
 
 > **CMinus -- write better C, get C back.**
+
+---
+
+<div align="center">
+    <img width="64" src="res/logo/CMinus-black.png"   >
+    <img width="64" src="res/logo/CMinus-red.png"     >
+    <img width="64" src="res/logo/CMinus-gold.png"    >
+    <img width="64" src="res/logo/CMinus-green.png"   >
+    <img width="64" src="res/logo/CMinus-blue.png"    >
+</div>
