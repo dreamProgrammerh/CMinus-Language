@@ -2,37 +2,34 @@
 
 This document defines the **CMinus (C-) type system**.
 
-
 The type system is designed to:
- - stay close to C’s mental model
- - avoid hidden runtime costs
- - preserve performance predictability
- - provide a rich set of primitive and composite types
+- stay close to C’s mental model
+- avoid hidden or surprising runtime behavior
+- preserve performance predictability
+- provide a rich set of primitive and composite types
 
-This is a **design document**, not a compiler reference.
+> This is a **design document**, not a compiler reference.
 
 ---
 
 ## Goals
 
 The CMinus type system aims to:
- - map cleanly to **C types**
- - be **explicit** not implicit
- - make unsafe operations visible
- - allow zero-cost abstractions
+- map cleanly to **C types**
+- be **explicit**, not implicit
+- make unsafe operations visible
+- allow zero-cost abstractions where possible
 
- ---
+---
 
 ## Design Principles
-
 
 ### 1. No Hidden Cost
 
 If an operation allocates memory, performs a copy, or introduces indirection,  
-it must be **visible in the code**.
+it should be **visible in the code** whenever possible.
 
-> This must be **applied** whenever possible.
-
+> This principle is applied by design, but may be refined through discussion.
 
 ### 2. C Compatibility First
 
@@ -40,12 +37,12 @@ Every CMinus type must have:
 - a clear C representation, or
 - a clearly documented transformation into C
 
-
 ### 3. Safety Is Optional, Not Mandatory
 
 CMinus provides **safety tools**, but never forces them.
-Unsafe behavior must be explicit.
+Unsafe behavior must be explicit and local.
 
+---
 
 ## Overview of Types
 
@@ -53,18 +50,533 @@ CMinus provides the following categories of types:
 
 - Primitive types
 - Pointer types
-- Length-Prefixed types
+- Constant types
+- Length-prefixed types
 - Array and slice types
-- String and substring types
+- String and str types
 - Struct and union types
-- Variant (tagged union) types
-- Class and data types
+- Variant and optional types
+- Data and class types
 - Function types
 
+Compile-time-only types:
+- `final`
+- `enum`
+- `typedef`
+- `options`
+- `interface`
+- `table`
+
+---
 
 ## Primitive Types
-## Composite Types
+
+Primitive types map directly to C primitives.
+
+| CMinus Type   | Description                     | C Mapping     |
+|---------------|---------------------------------|---------------|
+| **Integers**  |||
+| `i8`          | 8-bit signed integer            | `int8_t`      |
+| `i16`         | 16-bit signed integer           | `int16_t`     |
+| `i32`         | 32-bit signed integer           | `int32_t`     |
+| `i64`         | 64-bit signed integer           | `int64_t`     |
+| **Unsigned Integers** |||  
+| `u8`          | 8-bit unsigned integer          | `uint8_t`     |
+| `u16`         | 16-bit unsigned integer         | `uint16_t`    |
+| `u32`         | 32-bit unsigned integer         | `uint32_t`    |
+| `u64`         | 64-bit unsigned integer         | `uint64_t`    |
+| **Floating Point** |||  
+| `f32`         | 32-bit float                    | `float`       |
+| `f64`         | 64-bit float                    | `double`      |
+| **Size Types** |||
+| `isize`       | pointer-sized signed integer    | `intptr_t`    |
+| `usize`       | pointer-sized unsigned integer  | `uintptr_t`   |
+| **Characters** |||
+| `char`        | UTF-8 byte                      | `uint8_t`     |
+| `wchar`       | UTF-16 unit                     | `uint16_t`    |
+| `rune`        | UTF-32 unit                     | `uint32_t`    |
+| `bchar`       | byte chunk encoding             | `uint8_t`     |
+| **Logic** |||
+| `bool`        | boolean value                   | `uint8_t`     |
+| `trnry`       | ternary logic value             | `int8_t`      |
+| `void`        | no value                        | `void`        |
+
+Example:
+
+```c
+i32 count = 10;
+f64 pi = 3.14159;
+bool enabled = true;
+void f() {}
+```
+
+No implicit widening or narrowing conversions occur.
+
+---
+
+## Pointer Types
+
+Pointers behave like C pointers (subject to refinement).
+
+```c
+int* ptr;
+const int* freeze;
+int* const reference = &a;
+const int* const locked = &a;
+```
+
+Example:
+
+```c
+int a = 10;
+int b = 15;
+
+int* ptr = &a;                  // `ptr` is an int pointer
+*ptr = 20;                      // Allowed: modifying the value at the address
+ptr = &b;                       // Allowed: changing the address stored in `ptr`
+
+const int* freeze = &a;         // `freeze` is a const int pointer
+*freeze = 20;                   // Error: cannot modify the value at the address
+freeze = &b;                    // Allowed: changing the address stored in `freeze`
+
+int* const reference = &a;      // `reference` is a const pointer to int
+*reference = 20;                // Allowed: modifying the value at the address
+reference = &b;                 // Error: cannot change the address stored in `reference`
+
+const int* const locked = &a;   // `locked` is a const pointer to const int
+*locked = 20;                   // Error: cannot modify the value at the address
+locked = &b;                    // Error: cannot change the address stored in `locked`
+```
+
+Pointer rules follow standard C semantics regarding mutability and address stability.
+
+### Reference Types
+
+```c
+int& ref = a;
+ref = 20;                       // Allowed: modifying the value at the address
+ref = b;                        // Allowed: changing the address stored in `ref`
+
+const int& cref = a;
+cref = 20;                      // Error: cannot modify the value at the address
+cref = b;                       // Error: cannot change the address stored in `cref`
+```
+
+Reference rules follow standard C semantics regarding mutability, address stability, and they can't be null.
+
+Same as:
+
+```c
+int* const ref = &a;
+```
+
+### Safety
+
+* Reference arithmetic is allowed
+* Null references are allowed (pointers only)
+* Dereferencing invalid references is undefined behavior
+
+CMinus does **not** add runtime reference checks by default.
+
+---
+
+## Constant types
+
+```c
+const int a = 5;
+a = 10;             // Error: cannot modify constant value
+```
+
+Constant types are immutable and cannot be modified after initialization.
+
+* Unmodifiable variable
+* good for optimization  
+
+
+## Array Types
+
+### Fixed-Size Arrays+++
+
+```c
+int[10] values;
+```
+
+* Stored contiguously
+* Size known at compile time
+* Maps directly to C arrays
+
+### Length-Prefixed Arrays
+
+```c
+int[~10] arr = [1, 2, 3];
+```
+
+* Length stored explicitly
+* O(1) length access
+* Safer than raw C arrays
+
+---
+
+## Slice Types
+
+```c
+int[] slice1 = arr.subarr(0, 5);
+int[] slice2 = {*arr[0], 5};
+```
+
+A slice consists of:
+
+* a pointer
+* a length
+
+Slices do **not** own memory.
+
+---
+
+## String Types
+
+### Dynamic Strings
+
+```c
+string str = new "Hello, World!";
+string<32> str2 = new "string with 32 byte capacity";
+```
+
+* Mutable
+* Can grow or shrink
+* Convertible to/from C strings
+* O(1) byte access
+* Encoding-aware character access
+
+### Fixed-Size Strings
+
+```c
+str<16> fixedStr = "Fixed string";
+str str = "Auto detected string length";
+```
+
+* Immutable
+* Size known at compile time
+* No dynamic allocation unless explicitly requested
+* can act as `string` as long as it is not modified
+
+### Null-Terminated Strings
+
+```c
+char* nullStr = "Null terminated string\0";
+char[32] nullTermStr = "Null terminated string\0";
+```
+
+* C-compatible
+* `char*` is immutable
+* `char[]` is mutable
+* Null-terminated
+
+---
+
+## Struct Types
+
+```c
+struct Point {
+    int x;
+    int y;
+}
+```
+
+* Predictable layout
+* Field order preserved unless layout optimization is enabled
+* No hidden padding except ABI-required cases
+
+---
+
+## Union Types
+
+```c
+union Color {
+    u32 rgba;
+    struct {
+        byte r;
+        byte g;
+        byte b;
+        byte a;
+    };
+}
+```
+
+* Predictable layout
+* No hidden padding unless required by ABI
+
+---
+
+## Variant Types
+
+```c
+variant{int, string} value;
+```
+
+Variants are tagged unions:
+
+* One active type at a time
+* Explicit type checks required
+* Padding added only when needed
+
+```c
+if (value is int) {
+    int x = value as int;
+}
+```
+
+---
+
+## Optional Types
+
+```c
+int? maybeInt = none;
+maybeInt = 42;
+```
+
+Optional types represent a value that may or may not be present.
+
+* Safe default value
+* Explicit checks required
+
+```c
+if (maybeInt != none) {
+    int x = maybeInt;
+}
+```
+
+---
+
+## Data Types (Experimental)
+
+```c
+data Player {
+    hot vec3<float> position;
+    hot vec3<float> velocity;
+    warm i64 score;
+    cold string name;
+    u32 id;
+}
+```
+
+Data types are split into multiple internal layouts optimized by access frequency.
+
+* Improved cache locality
+* Reduced padding
+* Efficient iteration
+* Access remains transparent to the user
+
+---
+
+## Class Types
+
+```c
+class Person {
+    string name;
+    u32 age;
+
+    main(this.name, this.age);
+}
+```
+
+Classes are structs with inheritance support.
+
+* Optional layout optimization
+* Compile-time inheritance
+* No hidden runtime dispatch unless explicitly enabled
+
+---
+
+## Function Types
+
+```c
+i32 add(i32 a, i32 b) {
+    return a + b;
+}
+```
+
+* Known return types
+* Predictable behavior
+* Compile-time optimization friendly
+
+---
+
+## Compile-Time Constants and Final Bindings
+
+```c
+final int threshold = 10;
+final float pi = 3.14159265358979323846;
+```
+
+Final are compile-time constant, you cannot use runtime values inside them.
+
+* Can only contain compile-time constants
+* No runtime values allowed
+* Get resolved during compilation
+* No runtime overhead
+
+## The `new` Keyword
+
+The `new` keyword explicitly requests heap allocation.
+
+```c
+let s  = "allocate on heap when needed";
+let s2 = new "use the new keyword to allocate directly on heap";
+
+new 10;
+new "string";
+new Person("nobody");
+```
+
+* `new` makes allocation **explicit**
+* Allocation behavior without `new` is intentionally conservative
+* Exact allocation rules are **subject to discussion**
+
+The goal is to:
+
+* avoid surprises
+* keep code easy to reason about
+* make memory behavior visible
+
+---
+
+## `const` vs `final`
+
+`const` and `final` are both compile-time constants, but they have different characteristics:
+
+* `const` is a variable that cannot be modified after initialization (runtime fold).
+* `final` is a constant that cannot be modified after initialization (compile-time fold).
+
+### **Const**
+
+```c
+final int z = 10;
+
+int a = 14;
+const int b = 5;
+const int c = b * 2;
+const int d = a + z + 1;
+const int e = func();
+
+final int f = d;                // Error: runtime values cannot be used in final's
+a = 10;                         // Error: cannot modify constant value
+int[b] array = [1, 2, 3];       // Error: cannot use runtime values inside const
+struct s { int a = d }          // Error: cannot use runtime values as default value
+```
+
+**What is possible with `const` variables?**
+
+* Use runtime values, function calls, and expressions to initialize `const` values
+* Use one `const` variable to initialize another `const` variable
+* Use runtime variables to initialize `const` variables
+* Use `final` variables to initialize `const` variables
+
+**What is not possible with `const` variables?**
+
+* `const` variables cannot be used to initialize `final` variables
+* `const` variables cannot be modified after initialization
+* `const` variables cannot be used as default parameter values
+
+### **Final**
+
+```c
+final int a = 10;
+final int b = a * 2;
+
+const int c = b / 2;
+int d = a + c - 1;
+final int e = c + 1;            // Error: cannot use runtime values inside final
+
+int[b] array = [1, 2, 3];       // Valid
+struct s { int a = d }          // Valid
+```
+
+**What is possible with `final` variables?**
+* Use compile-time constants and other `final` variables to initialize new `final` variables
+* `final` variables can be used to declare array sizes and similar compile-time constructs
+* `final` variables can be used as default values in structs and function parameters
+* `final` variables can be used in runtime expressions
+
+**What is not possible with `final` variables?**
+* `final` variables cannot be initialized with runtime values, function calls, or non-constant expressions
+* `final` variables cannot be modified after initialization
+* `final` variables cannot be used to initialize other `final` variables if they depend on runtime values
+
+
+### **Key difference:**
+- **`const`**: Can be initialized with runtime values, but becomes immutable thereafter
+- **`final`**: Must be initialized with compile-time constants only, but then behaves like a constant
+
+---
+
 ## Type Safety Model
+
+CMinus safety is **explicit and local**.
+
+### Safe Operations
+
+* Type-checked assignments
+* Explicit casts
+* Compile-time type checking
+* Optional bounds checking
+
+### Unsafe Operations
+
+* Raw pointer arithmetic
+* Manual memory management
+* Unsafe casts
+
+Unsafe operations must be written explicitly.
+
+---
+
 ## Performance Model
+
+The CMinus type system aims to provide:
+
+* No garbage collection
+* No hidden reference counting
+* No runtime reflection
+* Predictable allocation behavior
+
+Exact allocation strategies are intentionally left open for discussion.
+
+---
+
 ## Use Cases
+
+### Systems Programming
+
+* Predictable layouts
+* Manual control
+* Low overhead abstractions
+
+### Game Development
+
+* Data-oriented design
+* Cache-friendly structures
+
+### Embedded Systems
+
+* Portable C output
+* No mandatory runtime
+
+---
+
 ## Non-Goals
+
+The CMinus type system intentionally does **not** provide:
+
+* Automatic garbage collection
+* Runtime reflection
+* Implicit polymorphism
+* Hidden object lifetimes
+
+These may exist as optional layers, but not in the core language.
+
+---
+
+## Conclusion
+
+CMinus provides a safe and predictable type system that is suitable for a wide range of applications. By explicitly managing memory and avoiding hidden object lifetimes, CMinus ensures that developers have full control over their code's behavior.
