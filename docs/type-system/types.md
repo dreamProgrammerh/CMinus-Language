@@ -63,6 +63,7 @@ Compile-time-only types:
 - `final`
 - `enum`
 - `typedef`
+- `generic`
 - `options`
 - `interface`
 - `table`
@@ -402,20 +403,6 @@ i32 add(i32 a, i32 b) {
 
 ---
 
-## Compile-Time Constants and Final Bindings
-
-```c
-final int threshold = 10;
-final float pi = 3.14159265358979323846;
-```
-
-Final are compile-time constant, you cannot use runtime values inside them.
-
-* Can only contain compile-time constants
-* No runtime values allowed
-* Get resolved during compilation
-* No runtime overhead
-
 ## The `new` Keyword
 
 The `new` keyword explicitly requests heap allocation.
@@ -438,6 +425,88 @@ The goal is to:
 * avoid surprises
 * keep code easy to reason about
 * make memory behavior visible
+
+---
+
+## Compile-Time Constants and Final Bindings
+
+```c
+final int threshold = 10;
+final float pi = 3.14159265358979323846;
+```
+
+Final are compile-time constant, you cannot use runtime values inside them.
+
+* Can only contain compile-time constants
+* No runtime values allowed
+* Get resolved during compilation
+* No runtime overhead
+
+---
+
+## Type Aliases
+
+`typedef` introduce a compile-time alias for an existing type.
+
+```c
+typedef flags = u64;
+typedef any = variant{i64, f64, bool, trnry, rune, string};
+typedef vec3<T> = (T x, T y, T z);
+typedef callback = void();
+typedef color = union {
+    u32 rgba = 0;
+    struct {
+        byte r, g, b, a;
+    }
+}
+```
+
+**Type aliases:**
+* do **not** create new types
+* have **no runtime cost**
+* are fully erased during compilation
+* exist only to improve readability and maintainability
+
+> Aliased types are always interchangeable with their underlying types.
+
+### Scope and Visibility
+
+type aliases follow normal scoping and module rules.
+
+Visibility control (such as public or private aliases) is handled by the module system, not by `typedef` itself.
+
+---
+
+## Generic 
+
+Generics in CMinus allow types and functions to be parameterized by other types.
+
+Generics are a **compile-time-only feature**.  
+All generic parameters are resolved during compilation and produce concrete C code.
+
+There is **no runtime representation** of generics.
+
+### Basic Usage
+
+```c
+List<int> numbers;
+Map<string, int> table;
+
+typedef vec3<t> = (t, t, t);
+typedef mat4<t> = t[4][4];
+
+vec3<float> position;
+mat4<int> camera;
+```
+
+Generic parameters must be fully known at compile time.
+
+**Semantics**
+* Generic instantiations generate concrete types
+* No type information exists at runtime
+* No dynamic dispatch is introduced
+* Predictable performance
+* Each specialization is compiled independently
 
 ---
 
