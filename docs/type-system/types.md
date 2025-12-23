@@ -428,7 +428,7 @@ The goal is to:
 
 ---
 
-## Compile-Time Constants and Final Bindings
+## Compile-Time Constants (`final`)
 
 ```c
 final int threshold = 10;
@@ -444,7 +444,36 @@ Final are compile-time constant, you cannot use runtime values inside them.
 
 ---
 
-## Type Aliases
+## Named magic Numbers (`enum`)
+
+```c
+enum Color {
+    Red = 0xFF0000,
+    Green = 0x00FF00,
+    Blue = 0x0000FF,
+};
+
+enum: u8 Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+};
+
+Color color = Color::Red;               // 0xFF0000
+Direction direction = Direction::Up;    // 0
+```
+
+Enums are a compile-time constant, you cannot use runtime values inside them.
+
+* Can only contain compile-time constants
+* No runtime values allowed
+* Get resolved during compilation
+* No runtime overhead
+
+---
+
+## Type Aliases (`typedef`)
 
 `typedef` introduce a compile-time alias for an existing type.
 
@@ -498,7 +527,7 @@ typedef mat4<t> = t[4][4];
 vec3<float> position;
 mat4<int> camera;
 ```
-
+  
 Generic parameters must be fully known at compile time.
 
 **Semantics**
@@ -507,6 +536,303 @@ Generic parameters must be fully known at compile time.
 * No dynamic dispatch is introduced
 * Predictable performance
 * Each specialization is compiled independently
+
+---
+
+## Scoped Type Wrapper (`options`)
+
+`options` defines a **scoped set of named constants** associated with a base type.
+
+The declared names exist **only within the scope where the option is used** and are erased during compilation.
+
+**Definition scope:**
+```c
+options<int>{up, down, left, right} direction = up;
+// `up`, `down`, `left`, `right` are visible only here
+// underlying type is `int`
+// `up` maps to `0`, `down` to `1`, etc.
+```
+
+**Completion result:**
+```c
+options<u32>{red=0xFF0000, green=0x00FF00} color = green;
+
+// after compilation
+u32 color = 0x00FF00;
+```
+
+**Type aliases scope:**
+```c
+typedef ID = options<variant{str, int}>{s="8496814", i=544658};
+ID id = s;
+```
+
+**Function scope:**
+```c
+options<i8>{less=-1, equal=0, more=1}
+compare(str s1, str s2) {
+    return less when s1 < s2;
+    return more when s1 > s2;
+    return equal;
+}
+```
+
+* `options` wraps an existing type
+* Each option maps to a constant value of that type
+* Option names are scoped and non-exported
+* All names are resolved at compile time
+* No runtime metadata is generated
+
+### **Design Intent**
+
+**Properties**
+* Can be used with type aliases
+* Has zero runtime cost
+* Improves readability and intent
+* Acts as a lightweight, inline alternative to enums
+
+`options` exists to:
+* avoid global enums
+* prevent name pollution
+* express intent locally
+* remain fully C-compatible
+
+It is intentionally minimal and does not introduce new types or runtime behavior.
+
+---
+
+## Interfaces (Compile-Time Prototypes)
+
+An `interface` defines a **compile-time prototype** for types.
+
+It describes the **required structure and behavior** of a type, without introducing inheritance, runtime dispatch, or metadata.
+
+Interfaces exist only at compile time and are fully erased during compilation.
+
+**Basic Usage**
+```c
+interface Drawable {
+    void draw();
+}
+```
+```c
+struct Sprite : Drawable {
+    vec2 position;
+    void draw() {
+        canvas.drawImage(image, position.x, position.y);
+    }
+}
+
+class Player : Drawable  {
+    string name;
+    void draw() {
+        // draw player
+    }
+}
+```
+
+- An interface defines a prototype, not a base type
+- Implementing an interface means:
+  - required fields exist (if specified)
+  - required functions exist with matching signatures
+- All checks are performed at compile time
+- No runtime indirection is introduced
+
+### Relationship to Structs and Classes
+- Structs and classes may implement interfaces
+- Interfaces do not imply inheritance
+- Multiple interfaces may be implemented by the same type
+- Interface implementation does not change the underlying type
+
+The interface is used only for verification, not composition.
+
+---
+
+## Static Tables (`table`)
+
+A `table` defines a **compile-time static lookup table**.
+
+Tables are resolved entirely during compilation and stored in **static memory**.
+All accesses are lowered to **direct index-based access** in the generated C code.
+
+```c
+table<string> Colors {
+    "red"    = "red color",
+    0x00FF00 = "green hex",
+    10       = "special",
+    'A'      = "capital",
+};
+````
+
+* A table maps **compile-time constant keys** to values
+* Keys are resolved and indexed at compile time
+* Values are stored in a contiguous static array
+* No runtime hashing or lookup is performed
+* Tables are immutable after compilation
+
+---
+
+### Table Value Type
+
+The type parameter in `table<T>` specifies the **value type** stored in the table.
+
+At compilation, the table is lowered to a static array of that type:
+
+```c
+table<string> Colors { ... };
+
+// lowered form
+string Colors[];
+```
+
+All values in the table must be compatible with `T`.
+
+#### Variant Values
+
+To store values of different types, a variant may be used as the table type:
+
+```c
+table<variant{string, int}> Mixed {
+    "name" = "mmd",
+    "age"  = 18,
+};
+```
+
+The generated storage remains a single static array.
+
+---
+
+### Keys
+
+#### Allowed Key Types
+
+Table keys may be **any compile-time constant**, including:
+
+* string literals
+* character literals
+* numeric literals (decimal, hex, binary, octal)
+* boolean values
+* `null`, `none`, and similar literals
+* `final` compile-time bindings
+
+```c
+final key = "red";
+Colors[key];     // equivalent to Colors["red"]
+```
+
+Runtime values are not allowed as keys.
+
+---
+
+### Access Forms
+
+#### Key-Based Access
+
+```c
+Colors["red"];        // "red color"
+Colors[0x00FF00];     // "green hex"
+```
+
+If the key is known at compile time, access is resolved to a constant index.
+
+---
+
+#### Compile-Time Index Access
+
+```c
+Colors::"red";        // compile-time index of "red"
+```
+
+The `::` operator retrieves the index assigned to a key during compilation.
+
+---
+
+#### Index-Based Access
+
+```c
+Colors![3];           // unchecked access, panics if out of bounds
+Colors?[99];          // safe access, returns optional
+```
+
+* `!` performs unchecked access
+* `?` performs safe access and returns an optional value
+
+---
+
+### Key Normalization (Internal)
+
+All table keys are normalized into internal string identifiers during compilation.
+This process is deterministic and exists solely to ensure stable indexing.
+
+Examples of internal normalization:
+
+```text
+"red"        -> "$$red"
+'x'          -> "$x"
+1            -> "1"
+-1           -> "_1"
+0xA          -> "10"
+true         -> "Ztrue"
+false        -> "Zfalse"
+null         -> "Znull"
+```
+
+> Key normalization is an **internal compiler detail**.
+> Programs must not depend on the exact normalized representation.
+
+---
+
+### Properties
+
+* Stored in static memory
+* Zero runtime lookup cost
+* Predictable performance
+* Fully C-compatible output
+* Suitable for systems and embedded code
+
+---
+
+### Error Handling
+
+* Duplicate keys result in a compile-time error
+* Invalid runtime keys are rejected at compile time
+* Out-of-bounds index access behavior is explicit (`!` or `?`)
+
+---
+
+### Design Intent
+
+Static tables exist to:
+
+* replace runtime maps with compile-time data
+* eliminate hashing and dynamic allocation
+* provide fast, index-based lookup
+* keep behavior explicit and predictable
+
+Tables intentionally do **not**:
+
+* allocate memory at runtime
+* support mutation
+* perform runtime key comparison
+* introduce hidden control flow
+
+---
+
+### Example: Complete Usage
+
+```c
+table<variant{string, int}> Data {
+    "name" = "mmd",
+    "age"  = 18,
+    1      = "one",
+};
+
+println(Data["name"]);
+println(Data![1]);
+println(Data?[99] ?? "none");
+```
+
+All accesses compile down to direct array indexing.
 
 ---
 
