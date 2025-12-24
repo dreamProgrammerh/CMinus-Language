@@ -44,6 +44,7 @@
 #define K_public        "public"
 #define K_module        "module"
 #define K_using         "using"
+#define K_volatile      "volatile"
 #define K_static        "static"
 #define K_inline        "inline"
 #define K_flat          "flat"
@@ -106,3 +107,18 @@
 #define K_bool        "bool"
 #define K_trnry       "trnry"
 #define K_void        "void"
+
+#define K_string      "string"
+#define K_str         "str"
+
+/* Predefined Type Aliases */
+#define K_byte        "byte"
+#define K_short       "short"
+#define K_int         "int"
+#define K_long        "long"
+#define K_ubyte       "ubyte"
+#define K_ushort      "ushort"
+#define K_uint        "uint"
+#define K_ulong       "ulong"
+#define K_float       "float"
+#define K_double      "double"
