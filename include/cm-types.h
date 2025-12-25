@@ -16,6 +16,7 @@
  * - Boolean type (bool) with true/false constants
  * - Ternary type (trnry) with down(n)/up(n)/middle intensity macros
  * - Platform-dependent pointer-sized integers (isize, usize)
+ * - Structured types (string, vec, ivec, Color)
  * - Min/max constants for all numeric types
  * 
  * Usage: #include "cm-types.h"
@@ -159,3 +160,22 @@ typedef signed char           trnry;
     
     #define ISIZE_BITS 32
 #endif
+
+// Structure types
+
+typedef struct { c8*  data; usize len; } string8;
+typedef struct { c16* data; usize len; } string16;
+typedef struct { c32* data; usize len; } string32;
+typedef struct { const c8* ptr; usize len; } slice;
+#define String(s)   { .data = (s), .len = sizeof(s)-1 }
+#define Slice(s)    { .ptr  = (s), .len = sizeof(s)-1 }
+
+typedef struct { f32 x, y; }           vec2;
+typedef struct { f32 x, y, z; }        vec3;
+typedef struct { f32 x, y, z, w; }     vec4;
+typedef struct { i32 x, y; }           ivec2;
+typedef struct { i32 x, y, z; }        ivec3;
+typedef struct { i32 x, y, z, w; }     ivec4;
+
+
+typedef Color union { u32 rgba; struct { u8 r, g, b, a;} }
