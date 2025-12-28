@@ -3,6 +3,11 @@
     "C": ["C", "H"]
   },
   "lsp": {
+    "snippet-completion-server": {
+      "settings": {
+        "feature_paths": true
+      }
+    },
     "clangd": {
       "initialization_options": {
         "compilationDatabaseCommand": "",
