@@ -391,7 +391,7 @@ trnry ternary = down;
 
 `trnry`:
 
-* valid values: `up`, `down`, `middle`, `up[0-127]`, `down[0-127]`
+* valid values: `down`, `middle`, `up`, `down[0-127]`, `up[0-127]`
 * lower to `int8_t`
 * represents three-state logic or expanded level of up/down logic
 * semantics defined by usage, not enforced by the type system
@@ -399,8 +399,9 @@ trnry ternary = down;
 No implicit truthiness exists:
 
 ```c
-if (1) {}     // error
-if (true) {}  // OK
+if (1) {}           // error
+if (true) {}        // OK
+if (1 is true) {}   // OK
 ```
 
 ---
@@ -531,12 +532,12 @@ String:
 | Literal                          | Description                          |
 | -------------------------------- | ------------------------------------ |
 | `"hello"`                        | String literal                       |
-| `u8"UTF-8"`                      | UTF-8 (default)                      |
-| `u16"UTF-16"`                    | UTF-16                               |
-| `u32"UTF-32/Runes"`              | UTF-32                               |
-| `bc"ByteChunk"`                  | ByteChunk network encoding           |
+| `t8"UTF-8"`                      | UTF-8 (default)                      |
+| `t16"UTF-16"`                    | UTF-16                               |
+| `t32"UTF-32"`                    | UTF-32                               |
+| `bc"ByteChunk"`                  | [ByteChunk](../byte-chunk/encoding.md) network encoding           |
 | `x"32CCEF2a"`                    | Hex bytes                            |
-| `b"01110001"`                    | Binary                               |
+| `b"01110001"`                    | Binary bytes                         |
 
 ---
 
@@ -817,7 +818,7 @@ Struct layout is:
 * field order preserved
 * padding inserted only when required by ABI or alignment rules
 
-The compiler may apply layout optimizations **only if explicitly enabled**.
+The compiler may apply layout optimizations **only if explicitly enabled** with tag `#[optimize(layout)]`.
 
 ---
 
@@ -1034,7 +1035,7 @@ Rules:
 
 * `is` checks the active variant type
 * `as` extracts the value
-* extraction without checking is a compile-time error (can be change)
+* extraction without checking is a compile-time error (maybe change to warning)
 
 ---
 
@@ -1164,6 +1165,7 @@ return value with error = 0;
 ## Failure value
 
 ```c
+return none;
 return none[12];
 ```
 
@@ -1195,7 +1197,7 @@ Optional values cannot be used directly.
 ```c
 string? s = readFile("a.txt");
 
-print(s);     // ✕ error
+print(s);   // ✕ error
 ```
 
 They must be explicitly handled using one of the access operators.
@@ -1238,7 +1240,7 @@ if (s == none[12]) {
 }
 ```
 
-Comparison is allowed only against `none[...]`.
+Comparison is allowed only against `none[0-255]`.
 
 ---
 
@@ -1256,7 +1258,7 @@ You must explicitly acknowledge failure paths.
 
 ---
 
-[]]6.7 Optional vs Variant
+### 6.7 Optional vs Variant
 
 Optional is **not** a variant:
 
@@ -1916,14 +1918,17 @@ int[~10] arr = [1, 2, 3];
 
 The stored length becomes `3`.
 
+> if think it should be `10` we will discuss it further.
+
 ---
 
 ### 10.8 Access
 
 ```c
 arr[0]    // no bounds check
-arr![1]   // panic when out of bounds
-arr?[2]   // return optional, none when out of bound
+arr:[1]   // always no bounds check
+arr![2]   // panic when out of bounds
+arr?[3]   // return optional, none when out of bound
 ```
 
 ---
@@ -2427,7 +2432,7 @@ These qualifiers affect **layout only**, not semantics.
 * avoid manual struct-of-arrays rewriting
 
 Especially useful in:
-`
+
 * game engines
 * simulations
 * ECS-style systems
@@ -2451,7 +2456,30 @@ May compile into iteration over `Player_hot.position[]`.
 
 ---
 
-### 13.7 Semantics and Guarantees
+### 13.7 Grouping Note
+Sure! Here's a clearer and more readable version of your explanation:
+
+---
+
+### Data Grouping Guidelines
+
+- **`hot`**:  
+  Use this group for data that is accessed **very frequently** and requires **fast iteration**.
+
+- **`warm`**:  
+  Suitable for data that is **accessed occasionally**, but still benefits from **efficient iteration**.
+
+- **`cold`**:  
+  Best for data that is **infrequently accessed**, yet still needs **reasonable iteration performance**.
+
+- **No group (default)**:  
+  If you don't assign a group, the data is stored directly in the main structure alongside the key.
+  This setup is optimized to **speed up iteration for grouped data**, but may not be ideal for general use.
+  Only use this option if you **understand the implications**--we do **not recommend** leaving data ungrouped unless you have a specific reason and know how it behaves.
+
+---
+
+### 13.8 Semantics and Guarantees
 
 * field access is transparent
 * no observable semantic difference from structs
@@ -2461,7 +2489,7 @@ May compile into iteration over `Player_hot.position[]`.
 
 ---
 
-### 13.8 Interaction With Other Types
+### 13.9 Interaction With Other Types
 
 * can contain structs, primitives, strings
 * can be used in arrays and slices
@@ -2471,7 +2499,7 @@ May compile into iteration over `Player_hot.position[]`.
 
 ---
 
-### 13.9 Restrictions
+### 13.10 Restrictions
 
 * cannot be used in C ABI directly
 * address of internal fields may not be stable
@@ -2480,7 +2508,7 @@ May compile into iteration over `Player_hot.position[]`.
 
 ---
 
-### 13.10 Summary
+### 13.11 Summary
 
 * `data` describes *what data exists*, not how it is laid out
 * compiler splits storage automatically
@@ -2607,7 +2635,7 @@ class Counter {
 
 Properties:
 
-* receive `this` implicitly
+* receive `this` & `base` implicitly
 * resolved at compile time
 * no hidden virtual dispatch
 
@@ -2645,14 +2673,15 @@ This behaves as *shadowing*, not virtual overriding.
 
 ### 14.9 Classes vs Structs
 
-| Feature              | Struct   | Class     |
-| -------------------- | -------- | --------- |
-| Named type           | ✓        | ✓         |
-| Fields               | ✓        | ✓         |
-| Methods              | ✕        | ✓         |
-| Inheritance          | ✕        | ✓         |
-| Layout control       | explicit | inherited |
-| Runtime polymorphism | ✕        | ✕         |
+| Feature              | Struct            | Class              |
+| -------------------- | ----------------- | -----------------  |
+| Named type           | ✓                 | ✓                  |
+| Fields               | ✓                 | ✓                  |
+| Methods              | ✕ (functions ✓)   | ✓                  |
+| Order                | ✓ preserved       | ✕ optimized        |
+| Inheritance          | ✕                 | ✓                  |
+| Layout control       | explicit          | inherited          |
+| Runtime polymorphism | ✕                 | ✕                  |
 
 ---
 
@@ -2699,7 +2728,31 @@ A function has:
 
 ---
 
-### 15.2 Function Type Syntax
+### 15.2 Function Signature
+
+A **function signature** describes the *name* of the function together with its **parameter types** and **return type**.  
+It is the unique identity used by the compiler for overload resolution and type checking.
+
+Example:
+
+```c
+int add(int a, int b);
+```
+
+Signature: `add(int,int) -> int`
+
+* The **name** is `add`  
+* The **parameters** are `(int, int)`  
+* The **return type** is `int`
+
+Signatures are always statically known and cannot change at runtime.  
+Defaults and variadics are handled at compile time, but do not alter the canonical signature.
+
+> For more depth and full rules, see **function-signature.md**.
+
+---
+
+### 15.3 Function Type Syntax
 
 The type of a function is written as:
 
@@ -2714,14 +2767,15 @@ Meaning:
 Example:
 
 ```c
-int(int, int) f = func(add, int, int);
+int(int, int) f = func add(int, int);
 ```
+`func` keyword to access a function reference or pointer at **compile time** based on its signature.
 
-`func` statement generates the function signature name at compile time, based on name and parameter types.
+reads like “give me the function add(int,int)"
 
 ---
 
-### 15.3 Calling Functions
+### 15.4 Calling Functions
 
 ```c
 int x = add(1, 2);
@@ -2731,12 +2785,12 @@ Function calls are direct and statically resolved.
 
 ---
 
-### 15.4 Function Values
+### 15.5 Function Values
 
 Functions can be assigned to variables:
 
 ```c
-int(int, int) op = func(add, int, int);
+int(int, int) op = func add(int, int);
 ```
 
 They may be passed as arguments:
@@ -2749,7 +2803,7 @@ void apply(int(int, int) f) {
 
 ---
 
-### 15.5 Function Pointers vs Function Values
+### 15.6 Function Pointers vs Function Values
 
 Internally, function values lower to function pointers.
 
@@ -2761,24 +2815,26 @@ However, semantically:
 
 ---
 
-### 15.6 Returning Functions
+### 15.7 Returning Functions
 
 ```c
 int(int, int) choose(bool add) {
-    if (add) return func(addFn, int, int);
-    return func(subFn, int, int);
+    if (add) return func addFn(int, int);
+    return func subFn(int, int);
 }
 ```
 
 ---
 
-### 15.7 No Closures (by default)
+### 15.8 No Closures (by default)
 
 Functions do **not** capture outer variables.
 
 ```c
 int x = 10;
-let f = \() -> x; // ✕ not allowed
+let f = \() -> x;       // ✕ not allowed
+let f = \[x]() -> x;    // explicit capture
+let f = \[&x]() -> x;   // explicit capture by reference
 ```
 
 By default only explicitly declared parameters are accessible.
@@ -2787,7 +2843,7 @@ This keeps functions predictable and ABI-friendly.
 
 ---
 
-### 15.8 Function Overloading
+### 15.9 Function Overloading
 
 Functions may be overloaded by parameter types.
 
@@ -2800,7 +2856,7 @@ Resolution is compile-time.
 
 ---
 
-### 15.9 Function Types and Pointers
+### 15.10 Function Types and Pointers
 
 Function types can be used wherever types are allowed:
 
@@ -2812,7 +2868,7 @@ They can be used in structs, tables, or generics.
 
 ---
 
-### 15.10 Summary
+### 15.11 Summary
 
 * functions are first-class values
 * statically typed and resolved
@@ -2954,7 +3010,7 @@ This affects **code generation scope**, not runtime behavior.
 
 ### Generic Constant (future)
 
-We plan to support generic constants:
+We are planing to introduce generic constants:
 
 ```c
 <uint Capacity>
@@ -3239,7 +3295,7 @@ No struct or runtime object is generated.
 You may constrain generic parameters:
 
 ```c
-typedef Numeric<T: Number> = T;
+typedef Number<T: Numeric> = T;
 ```
 
 This restricts valid substitutions at compile time.
@@ -3664,7 +3720,7 @@ This rule ensures that normal lexical scoping always has priority and avoids acc
 
 #### Accessing Option Constants Explicitly (`:` operator)
 
-To explicitly refer to an option constant, use the **option access operator** `:`.
+To explicitly refer to an option constant, use the **option access unary operator** `:`.
 
 ```c
 options<int>{x, y} a = :x;
@@ -3689,6 +3745,8 @@ The `:` operator:
 * is only valid inside option-related expressions
 
 It always refers to the **current option scope**.
+
+> we may change it to `:.` if become complicated.
 
 ---
 
@@ -3913,7 +3971,7 @@ Duplicate or conflicting keys produce a **compile-time error**.
 
 ### 19.8 Access Forms
 
-## **1. Compile-Time Key Access**
+#### **1. Compile-Time Key Access**
 
 ```c
 Colors["red"];
@@ -3933,7 +3991,7 @@ Colors_table[INDEX];
 
 ---
 
-## **2. Compile-Time Index Access**
+#### **2. Compile-Time Index Access**
 
 ```c
 Colors::"red";
@@ -3977,7 +4035,7 @@ Used when index comes from user input or computation.
 
 ---
 
-### 19.10 Runtime Index Access (Safe)
+### 19.10 Runtime Optional Index Access (Safe)
 
 ```c
 Colors?[3];
@@ -4493,8 +4551,8 @@ struct Pair<T, U> {
 ### 21.4 Generic Functions
 
 ```c
-void swap<T>(T a, T b) {
-    T tmp = a;
+void swap<T>(T& a, T& b) {
+    T& tmp = a;
     a = b;
     b = tmp;
 }
@@ -4577,44 +4635,88 @@ You may combine this with interface constraints:
 <T::int | float : Numeric>
 ```
 
-### 21.8 Generics Constant
+---
 
-generic constant are default strict constant used to initialize the type.
+### 21.8 Generic Constants
 
-here's an example of how it used in built in string:
+Generic constants are **compile-time values** used to configure types.
+
+They behave like generic parameters, but represent **values instead of types**.
 
 ```c
-struct string<u32 Capacity = 256 -> Capacity > 32, Char = c8 : Character> {
+<uint Capacity>
+```
+
+They may include compile-time constraints:
+
+```c
+<uint Capacity -> Capacity > 0 && Capacity < 1024>
+```
+
+Generic constants are:
+
+* evaluated at compile time
+* immutable
+* erased after compilation
+* usable in type definitions
+* required to satisfy their constraints
+
+---
+
+#### **Mixing Constants and Types**
+
+Generic constants can be combined with type parameters:
+
+```c
+<uint Capacity, T>
+```
+
+With constraints:
+
+```c
+<uint Capacity -> Capacity > 0, T::str | string | char[]>
+```
+
+---
+
+### Example: Generic String Type
+
+```c
+struct string<
+    u32 Capacity = 256 -> Capacity > 32,
+    Char = c8 : Character
+> {
     u32 capacity = Capacity;
     u32 length = 0;
     Char* data;
-
-    operator =  (string s)   { ... }
-    operator +  (string s)   { ... }
-    operator +  (Numeric n)  { ... }
-    operator >  (string s)   { ... }
-    operator <  (string s)   { ... }
-    operator == (string s)   { ... }
-    operator >= (string s)   { ... }
-    operator <= (string s)   { ... }
 }
 ```
 
-Usage:
+#### Usage
 
 ```c
-string str1 = "one";                // Capacity 256, Char c8
-string<32> str2 = "one";            // Capacity 32, Char c8
-string<32, c32> str3 = u32"one";    // Capacity 32, Char c32
-
-string<16> str4 = "one";            // Error Capacity don't match the requirements
+string str1 = "one";              // Capacity = 256, Char = c8
+string<32> str2 = "one";          // Capacity = 32
+string<32, c32> str3 = u32"one";  // Capacity = 32, Char = c32
 ```
 
-Rules:
+Invalid:
 
-* Capacity must be 32-bit unsigned integer
-* Capacity must be higher than 32
-* Char must be a character type
+```c
+string<16> s = "one"; // error: constraint not satisfied
+```
+
+---
+
+#### Rules Summary
+
+* generic constants are compile-time only
+* must satisfy declared constraints
+* may have default values
+* may be used in layout and initialization
+* generate no runtime data
+* participate in monomorphization
+* vanish after compilation
 
 ---
 
@@ -4682,9 +4784,11 @@ Errors include:
 
 ```c
 T f<T>(T x) {
-    x + 1; // error: operator not guaranteed (may change to warning)
+    x + 1; // error: operator not guaranteed
 }
 ```
+
+open to discuss if it should be warning instead of error.
 
 Unless constrained:
 
@@ -4945,6 +5049,8 @@ Tuples:
 * follow ABI rules
 * have no hidden metadata
 
+> same **tuple type** use same **struct type**, *no duplicate* struct type.
+
 Example lowering:
 
 ```c
@@ -5149,7 +5255,6 @@ r = other;     // rebinding not allowed
 | Rebindable              | ✕                   | ✓                 |
 | Requires initialization | ✓                   | ✕                 |
 | Syntax dereference      | implicit            | `*`               |
-| Can be null             | ✕                   | ✓                 |
 | Typical use             | parameters, aliases | ownership, memory |
 
 ---
@@ -5276,7 +5381,7 @@ void g(int& x) { }
 * receives reference
 
 ```c
-func h(int* x) { }
+void h(int* x) { }
 ```
 
 * receives pointer
@@ -5610,13 +5715,208 @@ They only add *checks where explicitly requested*.
 
 ---
 
-### Non-Goals of the CMinus Type System
+## 25 Compile-Time Type Properties
+
+CMinus provides a set of **compile-time property operators** used to query information about types and constant values.
+
+These operators:
+
+* are evaluated at compile time
+* never generate runtime code
+* return constant values
+* may be used in type expressions, generic constraints, and initializers
+
+They behave similarly to built-in compile-time functions.
+
+---
+
+### Overview
+
+Compile-time property operators include:
+
+* `sizeof(T)`
+* `alignof(T)`
+* `lengthof(T)`
+* `nameof(T)`
+* `typeof(expr)`
+* `typeid(T)`
+* `minof(T)`
+* `maxof(T)`
+* `defaultof(T)`
+
+All of them return compile-time constants.
+
+---
+
+### `sizeof(T)`
+
+Returns the size of a type in bytes.
+
+```c
+sizeof(int)      // 4
+sizeof(string)   // implementation-defined
+```
+
+Rules:
+
+* evaluated at compile time
+* equivalent to C `sizeof`
+* valid only for complete types
+
+---
+
+### `alignof(T)`
+
+Returns the required alignment of a type in bytes.
+
+```c
+alignof(int)
+alignof(struct Point)
+```
+
+Used for layout control and low-level memory handling.
+
+---
+
+### `lengthof(X)`
+
+Returns the length of a compile-time-known container.
+
+Applicable to:
+
+* fixed-size arrays
+* tuples
+* strings with known capacity
+* tables
+
+Examples:
+
+```c
+lengthof(int[10])        // 10
+lengthof((int, int))     // 2
+lengthof(string<32>)     // 32
+```
+
+---
+
+### `nameof(T)`
+
+Returns the compile-time name of a type or symbol.
+
+```c
+nameof(int)        // "int"
+nameof(MyStruct)   // "MyStruct"
+```
+
+Used for diagnostics, debugging, and code generation.
+
+---
+
+### `typeof(expr)`
+
+Returns the type of an expression.
+
+```c
+typeof(1 + 2)       // int
+typeof(value)       // inferred type
+```
+
+Used mainly in generics and compile-time logic.
+
+---
+
+### `typeid(T)`
+
+Returns a unique compile-time identifier representing a type.
+
+```c
+typeid(int)
+```
+
+Properties:
+
+* constant
+* comparable
+* stable within a compilation
+* not a runtime RTTI object
+
+Used for:
+
+* compile-time maps
+* specialization logic
+* static dispatch decisions
+
+---
+
+### `minof(T)` and `maxof(T)`
+
+Return the minimum and maximum representable values of a numeric type.
+
+```c
+minof(i32)   // -2147483648
+maxof(i32)   //  2147483647
+```
+
+Applicable to:
+
+* integer types
+* floating-point types
+* custom numeric types that define bounds
+
+---
+
+### `defaultof(T)`
+
+Returns the default value for a type.
+
+```c
+defaultof(int)        // 0
+defaultof(bool)       // false
+defaultof(string)     // empty string
+```
+
+Used for:
+
+* initialization
+* generics
+* compile-time fallback logic
+
+---
+
+### Usage in Constraints
+
+These operators may appear inside generic constraints:
+
+```c
+<uint N -> N < maxof(u16)>
+```
+
+Or:
+
+```c
+<T -> sizeof(T) <= 64>
+```
+
+---
+
+### Summary
+
+* all operators are compile-time only
+* produce constant values
+* usable in generics and constraints
+* introduce no runtime cost
+* enable expressive static reasoning
+* never allocate or execute code
+
+---
+
+## Non-Goals of the CMinus Type System
 
 The following are **explicitly not goals**, even if common in other modern languages.
 
 ---
 
-#### 1. Automatic Memory Management
+### 1. Automatic Memory Management
 
 CMinus will not provide:
 
@@ -5628,7 +5928,7 @@ Memory management is explicit and visible.
 
 ---
 
-#### 2. Implicit Safety Guarantees
+### 2. Implicit Safety Guarantees
 
 The language will not:
 
@@ -5641,7 +5941,7 @@ Safety must be requested using explicit syntax.
 
 ---
 
-#### 3. Runtime Polymorphism
+### 3. Runtime Polymorphism
 
 CMinus does not provide:
 
@@ -5654,11 +5954,11 @@ Polymorphism is resolved at compile time.
 
 ---
 
-#### 4. Reflection or Runtime Type Introspection
+### 4. Reflection or Runtime Type Introspection
 
 There is no:
 
-* `typeOf(x)`
+* runtime `typeOf(x)`
 * runtime RTTI
 * reflection API
 * dynamic inspection
@@ -5667,7 +5967,7 @@ All type reasoning happens at compile time.
 
 ---
 
-#### 5. Implicit Heap Allocation
+### 5. Implicit Heap Allocation
 
 The compiler will never:
 
@@ -5679,7 +5979,7 @@ Heap allocation always requires `new`.
 
 ---
 
-#### 6. Hidden Control Flow
+### 6. Hidden Control Flow
 
 CMinus avoids:
 
@@ -5692,7 +5992,7 @@ Control flow must be explicit in syntax.
 
 ---
 
-#### 7. Dynamic Typing
+### 7. Dynamic Typing
 
 CMinus does not support:
 
@@ -5704,7 +6004,7 @@ All types are known at compile time.
 
 ---
 
-#### 8. Implicit Conversions
+### 8. Implicit Conversions
 
 No automatic:
 
@@ -5718,7 +6018,7 @@ All conversions must be explicit.
 
 ---
 
-#### 9. Language-Level Memory Safety Guarantees
+### 9. Language-Level Memory Safety Guarantees
 
 CMinus does not attempt to prove:
 
@@ -5731,7 +6031,7 @@ These may be built externally or via conventions.
 
 ---
 
-#### 10. Magical Optimizations
+### 10. Magical Optimizations
 
 The compiler will not:
 
