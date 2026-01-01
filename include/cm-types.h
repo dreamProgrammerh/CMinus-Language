@@ -179,3 +179,36 @@ typedef struct { i32 x, y, z, w; }     ivec4;
 
 
 typedef Color union { u32 rgba; struct { u8 r, g, b, a;} }
+
+typedef union {
+    f32[4*4]  d1;
+    f32[4][4] d2;
+    struct {
+        f32
+        $00, $01, $02, $03,
+        $10, $11, $12, $13,
+        $20, $21, $22, $23,
+        $30, $31, $32, $33
+    }
+} mat4;
+
+typedef union {
+    f32[3*3]  d1;
+    f32[3][3] d2;
+    struct {
+        f32
+        $00, $01, $02,
+        $10, $11, $12,
+        $20, $21, $22
+    }
+} mat3;
+
+typedef union {
+    f32[2*2]  d1;
+    f32[2][2] d2;
+    struct {
+        f32
+        $00, $01,
+        $10, $11
+    }
+} mat2;
