@@ -179,6 +179,70 @@ Notes:
 
 ---
 
+## Named Allocation Tracing (debug-only)
+
+Idea: attach **human-readable names** to memory allocations to help debug memory usage and leaks.
+
+This feature is intended **only for debugging builds**.
+In release mode:
+
+* allocation names are ignored
+* no tracing metadata is generated
+* no runtime overhead is introduced
+
+Example syntax (idea only):
+
+```c
+alloc 5 of int with "int_array";
+```
+
+Meaning:
+
+* allocate space for 5 `int`
+* attach the debug name `"int_array"` to this allocation
+
+While the allocation exists (not freed or moved), debugging tools may display:
+
+* the allocation name
+* allocation size and type
+* source location (file / line)
+* where it was allocated
+* possibly which variable currently owns or references it
+
+Example debugging view (conceptual):
+
+```
+Allocation:
+  name: "int_array"
+  type: int[5]
+  size: 20 bytes
+  allocated at: foo.cm:42
+  referenced by: values
+```
+
+Manual deallocation may be allowed:
+
+```c
+free "int_array";
+```
+
+Notes:
+
+* this is a debug-only feature
+* freeing an allocation that is still referenced results in undefined behavior (likely crash)
+* name-based free is intended for debugging and testing only
+* only string literals are allowed as names (may change)
+
+Open questions:
+
+* should names be strings or compile-time literals?
+* should names be optional or required in debug mode?
+* can names change if the allocation is moved?
+* how to handle multiple allocations with the same name?
+* should this integrate with external memory profilers?
+
+---
+
 ## Open Questions / Needs Discussion
 
 * relationship between `decision` and generics
