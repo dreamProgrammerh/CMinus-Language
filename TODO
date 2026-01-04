@@ -1,0 +1,196 @@
+# TODO / Ideas / Things To Think About
+
+This file is **not documentation**.
+
+It is a place to:
+- drop raw ideas
+- note features that need discussion
+- remember unfinished work
+- collect frequently requested features
+- write things down before they are forgotten
+
+Nothing here is final.  
+Syntax, behavior, and even existence may change.
+
+---
+
+## Linking
+
+### Static library linking
+
+```c
+llink "opengl32";
+````
+
+Notes:
+
+* compile-time only
+* maps to system linker
+* syntax seems OK but not final
+
+---
+
+### Dynamic library linking (runtime)
+
+* no syntax yet
+* likely via runtime API, not language syntax
+* platform-dependent
+* needs discussion
+
+---
+
+## Bit / Memory Layout Types
+
+Idea: explicit bit-level layout types for packets, protocols, hardware, etc.
+
+```c
+layout: 16 BCPpacket {
+    0..1:  u8 action;
+    2..8:  u32 state;
+    9..15: u8 value;
+    9..10: bool lastPacket;
+}
+```
+
+Notes:
+
+* layout size explicitly declared
+* bit ranges are inclusive
+* bit overlap is allowed but must be handled carefully
+* underlying type only used for cast on access
+* unused bits in the type are zeroed
+* syntax mostly works but needs validation rules
+
+Things to decide:
+
+* alignment rules
+* endianness
+* whether layout types can nest
+* interaction with structs / unions
+
+---
+
+## Compile-Time Decisions (`decision`)
+
+Idea: select implementation at compile time instead of branching at runtime.
+
+```c
+decision toNumber(str s, final u16 base) {
+    case base == 16: fastStrToHex(s);
+    case base == 10: fastStrToDec(s);
+    case base == 2:  fastStrToBin(s);
+}
+```
+
+Notes:
+
+* works only when some parameters are `final`
+* compiler chooses one path
+* other paths disappear
+* intended to replace slow generic functions
+
+Needs discussion:
+
+* syntax vs `switch`
+* error handling
+* diagnostics when no case matches
+
+---
+
+### Decision with compile-time literals
+
+```c
+decision align(str s, literal["up", "down", "left", "right"] dir) {
+    case dir == "up":    optimizedUpAlign(s);
+    case dir == "down":  fasterDownAlign(s);
+    case dir == "left":  reverseAlignOf(s, dir);
+    case dir == "right": ...
+}
+```
+
+Call site:
+
+```c
+align("\n   Hello   \n", "left");
+```
+
+Lowered to:
+
+```c
+reverseAlignOf("\n   Hello   \n", "left");
+```
+
+Feels like controlled source replacement but type-safe.
+
+---
+
+## Compile-Time Literals (`literal`)
+
+Idea: value-restricted types (similar to TS literal types).
+
+### Union literal types
+
+```c
+literal{ u8 | bool } a;
+```
+
+```c
+a = true;     // ok
+a = 10u8;     // ok
+a = 10;       // no
+a = 10u16;    // no
+```
+
+Runtime values are rejected:
+
+```c
+int x = 10;
+a = x; // invalid
+```
+
+---
+
+### Strict literal sets
+
+```c
+literal["up" | "down" | "left" | "right"] dir;
+```
+
+Only these exact values are allowed.
+
+---
+
+### Mixed literal sets
+
+```c
+literal[
+    "red" | "green" | "blue" |
+    0xFF0000 | 0x00FF00 | 0x0000FF |
+    true | null
+] color;
+```
+
+Notes:
+
+* literals only
+* `none` is not a literal
+* compile-time only
+* erased after compilation
+
+---
+
+## Open Questions / Needs Discussion
+
+* relationship between `decision` and generics
+* how far literal types should go
+* whether bit-layout types are worth the complexity
+* static vs runtime linking ergonomics
+* diagnostics and error messages
+* which of these deserve real documentation
+
+---
+
+## Reminder
+
+If it feels half-baked, **it belongs here**.
+If it feels stable, **move it to real docs**.
