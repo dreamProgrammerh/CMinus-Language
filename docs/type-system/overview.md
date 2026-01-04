@@ -1,103 +1,79 @@
 # Type System (Overview)
 
-This document defines the **CMinus (C-) type system**.
+This document describes the **CMinus (C-) type system** and how each type behaves in practice.
 
-The type system is designed to:
+The type system is intentionally explicit:
+- no hidden allocations
+- no silent conversions
+- no invisible safety or performance costs
 
-* stay close to C’s mental model
-* avoid hidden runtime costs
-* preserve performance predictability
-* make ownership, allocation, and safety explicit
-* provide expressive abstractions without semantic surprises
-
-> This document is a **language contract**. The behavior described here is intentional and stable unless explicitly stated otherwise.
-
----
-
-## Design Goals
-
-The CMinus type system aims to:
-
-* map cleanly and predictably to **C code**
-* avoid implicit behavior and silent conversions
-* make unsafe operations visible in syntax
-* allow zero-cost abstractions
-* keep performance characteristics obvious to the programmer
-
----
-
-## Core Principles
-
-### Explicit Cost
-
-If an operation allocates memory, copies data, performs a runtime check, or introduces indirection, it must be **visible in code**.
-
-The compiler may optimize implementations, but must not change observable behavior or introduce hidden work.
-
----
-
-### C Compatibility
-
-Every CMinus type must:
-
-* have a direct C representation, or
-* lower deterministically into C constructs
-
-Generated C code is intended to be readable, inspectable, and debuggable.
-
----
-
-### Explicit Safety
-
-CMinus provides safety mechanisms, but never forces them.
-Unsafe behavior is allowed, but must be written explicitly and locally.
+Everything described here is **observable in syntax**.
 
 ---
 
 ## Predefined Type Aliases
 
-For familiarity and interoperability, CMinus defines the following aliases:
+For familiarity and C compatibility, the following aliases exist:
 
-| Alias    | Underlying Type |
-| -------- | --------------- |
-| `byte`   | `i8`            |
-| `short`  | `i16`           |
-| `int`    | `i32`           |
-| `long`   | `i64`           |
-| `ubyte`  | `u8`            |
-| `ushort` | `u16`           |
-| `uint`   | `u32`           |
-| `ulong`  | `u64`           |
-| `float`  | `f32`           |
-| `double` | `f64`           |
+```c
+byte   = i8
+short  = i16
+int    = i32
+long   = i64
 
-These aliases introduce **no new semantics** and exist purely for readability and C compatibility.
+ubyte  = u8
+ushort = u16
+uint   = u32
+ulong  = u64
 
----
+float  = f32
+double = f64
+````
 
-## Primitive Types
-
-Primitive types map directly to C primitives and have fixed, predictable behavior.
-
-| Type       | Description                    | C Mapping  |
-| ---------- | ------------------------------ | ---------- |
-| `i8`–`i64` | signed integers                | `int*_t`   |
-| `u8`–`u64` | unsigned integers              | `uint*_t`  |
-| `f32`      | 32-bit floating point          | `float`    |
-| `f64`      | 64-bit floating point          | `double`   |
-| `isize`    | pointer-sized signed integer   | `int64_t`  |
-| `usize`    | pointer-sized unsigned integer | `uint64_t` |
-| `bool`     | boolean value                  | `uint8_t`  |
-| `trnry`    | ternary logic                  | `int8_t`   |
-| `void`     | no value                       | `void`     |
-
-No implicit widening, narrowing, signedness, or boolean conversions occur.
+These are pure aliases and introduce no new behavior.
 
 ---
 
-## `const` and `final`
+## Variable Declarations
 
-CMinus distinguishes **immutability** from **compile-time evaluation**.
+### `let`, `const`, `final`
+
+CMinus has three declaration keywords:
+
+```c
+let     // mutable
+const   // immutable (runtime)
+final   // compile-time constant
+```
+
+`let` is the **default** and may be omitted.
+
+```c
+int a = 5;
+let int a = 5;    // same as above
+```
+
+If no type is specified, it is inferred from the right-hand side:
+
+```c
+let a = 1;        // inferred i32
+const b = 1;      // inferred i32, immutable
+final c = 1;      // inferred i32, compile-time
+```
+
+Rules:
+
+* inference happens once at declaration
+* inferred type never changes
+* ambiguous inference is a compile-time error
+
+```c
+let x = null; // error
+```
+
+---
+
+## `const` vs `final`
 
 ### `const`
 
@@ -105,11 +81,9 @@ CMinus distinguishes **immutability** from **compile-time evaluation**.
 const int x = runtimeValue();
 ```
 
-* the value cannot be modified after initialization
-* the value may depend on runtime data
-* primarily used to express intent and enforce safety
-
-The compiler may optimize `const` values when possible, but such optimizations must not affect program semantics.
+* value cannot be reassigned
+* value may depend on runtime data
+* primarily a safety guarantee
 
 ### `final`
 
@@ -117,102 +91,128 @@ The compiler may optimize `const` values when possible, but such optimizations m
 final int y = 10;
 ```
 
-* the value is known at compile time
-* usable in compile-time contexts (types, tables, options, indices)
-* guaranteed to be constant
+* value is known at compile time
+* usable in types, tables, options, array sizes, etc.
+* required for any compile-time context
 
-The compiler may internally treat some `const` values as `final` when no runtime data is involved, but this is an optimization detail and not part of the language semantics.
+The compiler *may* fold some `const` values into `final`, but this is an optimization, not a language rule.
 
 ---
 
-## Pointer Types
+## Primitive Types
 
-Pointers behave like C pointers and follow C semantics.
+Primitive types map directly to C primitives.
+
+| Type             | Notes             |
+| ---------------- | ----------------- |
+| `i8`--`i64`       | signed integers   |
+| `u8`--`u64`       | unsigned integers |
+| `f32`, `f64`     | floating point    |
+| `isize`, `usize` | pointer-sized     |
+| `bool`           | boolean           |
+| `trnry`          | ternary logic     |
+| `void`           | no value          |
+
+There are:
+
+* no implicit casts
+* no implicit widening or narrowing
+* no implicit boolean conversions
+
+---
+
+## Pointers
+
+Pointers behave like C pointers.
 
 ```c
-int* ptr;
-const int* readOnly;
-int* const fixed;
+int* p;
+const int* rp;
+int* const fp;
 ```
 
 Properties:
 
-* pointers may be null
+* may be null
 * pointer arithmetic is allowed
-* dereferencing invalid or null pointers is undefined behavior
-
-No implicit runtime checks are introduced.
+* invalid dereference is undefined behavior
+* no implicit runtime checks
 
 ---
 
-## Reference Types
+## References (`&`)
 
-References represent **non-null, stable aliases** to existing objects.
+References are **non-null aliases**.
 
 ```c
-int& ref = value;
+int& r = value;
 ```
 
-Semantics:
+Rules:
 
-* references are never null
-* always refer to a valid object
-* cannot be rebound to refer to a different object
+* never null
+* always bound to a valid object
+* cannot be rebound
 
-References lower to `T* const` in C, but with stronger semantic guarantees enforced by the compiler.
+Conceptually:
+
+```c
+int&   -> int* const   (with non-null guarantee)
+```
 
 ---
 
 ## Optional Types (`T?`)
 
-Optional types represent values that may fail or be absent.
+Optional types represent failure-capable values.
 
 ```c
 string? readFile(str path);
 ```
 
-Optional is **not** a variant type.
+Optional is **not** a variant.
 
-Conceptually, an optional is equivalent to:
+Conceptually:
 
 ```c
 struct Optional<T> {
-    T value;
-    u8 errorCode;
+    T  value;
+    u8 error;
 }
 ```
 
-* `errorCode == 0` indicates success
-* non-zero values represent explicit failure reasons
+* `error == 0` → success
+* non-zero error → failure reason
 
 ```c
-return none[12];
+return none[12];   // explicit error code
 ```
 
-Optional values must be explicitly handled by the caller. They are never implicitly removed, ignored, or optimized away.
+Optional values **must** be handled.
+They are never silently ignored or optimized away.
 
 ---
 
 ## Allocation and `new`
 
-CMinus separates **value semantics** from **allocation semantics**.
+CMinus separates **value semantics** from **allocation**.
 
 ```c
-let a = value;      // value semantics
+let a = value;      // stack / value semantics
 let b = new value;  // explicit heap allocation
 ```
 
 Rules:
 
 * `new` always allocates on the heap
-* assignment may copy or move values depending on type-defined behavior
-* allocation without `new` is explicit and type-defined
+* assignment behavior is type-defined
+* no implicit heap allocation
 
 ### Strings
 
-* `string` is always heap-allocated and resizable
-* `str` is stack-allocated by default
-* `str*` may reference heap-allocated string data
+* `string` → always heap allocated (growable)
+* `str` → stack by default
+* `str*` → pointer to string storage
 
 ---
 
@@ -224,9 +224,9 @@ Rules:
 int[10] values;
 ```
 
-* contiguous storage
+* contiguous
 * compile-time size
-* direct C array mapping
+* maps directly to C arrays
 
 ### Length-Prefixed Arrays
 
@@ -234,9 +234,9 @@ int[10] values;
 int[~10] arr;
 ```
 
-* stores length alongside data
+* length stored alongside data
 * O(1) length access
-* safer alternative to raw C arrays
+* safer than raw C arrays
 
 ---
 
@@ -246,16 +246,60 @@ int[~10] arr;
 int[] slice;
 ```
 
-Slices consist of:
+A slice is:
 
-* a pointer
-* a length
+* pointer
+* length
 
-Slices do not own memory and never allocate implicitly.
+Slices:
+
+* do not own memory
+* never allocate
+* are safe only when used correctly
 
 ---
 
-## Struct Types
+## Tuples
+
+Tuples are **inline anonymous structs**.
+
+```c
+(int, string)
+```
+
+Equivalent to:
+
+```c
+struct {
+    int    $0;
+    string $1;
+}
+```
+
+Named tuples:
+
+```c
+(int code, string state)
+```
+
+Equivalent to:
+
+```c
+struct {
+    int    code;
+    string state;
+}
+```
+
+Rules:
+
+* if one element is named, all must be named
+* zero runtime cost
+* purely structural
+
+---
+
+## Structs
 
 ```c
 struct Point {
@@ -264,63 +308,67 @@ struct Point {
 }
 ```
 
-* predictable memory layout
+* predictable layout
 * field order preserved
-* padding only when required by ABI or optimization
+* padding only when required
 
 ---
 
-## Union Types
+## Unions
 
 ```c
 union Color {
     u32 rgba;
-    struct { u8 r; u8 g; u8 b; u8 a; };
+    struct { u8 r, g, b, a; };
 }
 ```
 
 * overlapping storage
-* predictable layout
 * no hidden tagging
+* ABI-visible layout
 
 ---
 
-## Variant Types
+## Variants
 
 ```c
-variant{int, string} value;
+variant{int, string} v;
 ```
 
 * tagged union
-* exactly one active value at a time
-* explicit type checks and casts required
+* one active value at a time
+* explicit checks required
 
-Variants do not include error semantics; they represent data alternatives only.
+```c
+if (v is int) {
+    int x = v as int;
+}
+```
+
+Variants are **data-only**, not error types.
 
 ---
 
-## Data-Oriented Types (`data`)
+## Data Types (`data`)
 
 ```c
 data Player {
-    hot vec3<float> position;
-    hot vec3<float> velocity;
+    hot  vec3<float> position;
+    hot  vec3<float> velocity;
     warm i64 score;
     cold string name;
 }
 ```
 
-Data types describe logical structures that are split into multiple physical layouts based on access frequency.
+Data types:
 
-Properties:
-
-* cache-friendly layout
-* automatic padding and grouping optimization
-* semantic transparency to the programmer
+* split fields into multiple layouts
+* optimize cache behavior
+* behave like structs semantically
 
 ---
 
-## Class Types
+## Classes
 
 ```c
 class Person {
@@ -329,26 +377,30 @@ class Person {
 }
 ```
 
-* classes are struct-based
+* struct-based
 * inheritance supported
-* dispatch resolved at compile time
+* compile-time dispatch
 * no hidden runtime polymorphism
 
 ---
 
-## Function Types
+## Functions
 
 ```c
 int add(int a, int b);
 ```
 
-Functions are first-class values with statically known signatures.
+Functions:
+
+* have fixed signatures
+* are first-class values
+* may be assigned, passed, and stored
 
 ---
 
 ## Generics
 
-Generics are available on:
+Generics exist on:
 
 * structs
 * classes
@@ -357,91 +409,134 @@ Generics are available on:
 * tables
 * options
 
-Runtime-generating constructs are monomorphized per used type.
-Compile-time-only constructs use generics for validation and vanish after compilation.
+Rules:
+
+* runtime types are monomorphized
+* compile-time-only constructs vanish after validation
+* no runtime generic metadata
 
 ---
 
-## Compile-Time Constructs
-
-### `typedef`
+## `typedef`
 
 ```c
 typedef Name = Complex<Type>;
 ```
 
 * compile-time only
-* no runtime cost
+* zero runtime cost
 * may be generic
-* used to improve readability and abstraction
+* improves readability
 
 ---
 
-### `options`
+## `options`
 
-Scoped named constants bound to a base type.
+Scoped named constants bound to a type.
 
 ```c
 options<i8>{less=-1, equal=0, more=1}
 ```
 
+Properties:
+
 * compile-time only
 * zero runtime cost
-* auto-counter assignment when applicable
+* optional auto-counter behavior
+
+### Scope Priority
+
+```c
+int x = 2;
+
+options<int>{x, y} a = x;   // variable x → 2
+options<int>{x, y} b = :x;  // option constant x → 0
+```
+
+`:` explicitly refers to the option constant.
 
 ---
 
-### `interface`
-
-Interfaces define **compile-time prototypes** for structs and classes.
+## Interfaces
 
 ```c
 interface Drawable {
-    void draw();
+    draw();
 }
 ```
 
+Interfaces:
+
+* are compile-time only
 * must be explicitly implemented
-* fields and methods allowed
-* default implementations supported
-* no runtime behavior or layout impact
+* may define fields, methods, constructors
+* may provide `default` implementations
+* introduce no runtime layout
 
 ---
 
-### `table`
-
-Compile-time static lookup tables.
+## Tables
 
 ```c
-table<u32> Colors {
-    "red" = 0xFF0000,
+table<string> Colors {
+    "red"    = "red color",
+    0x00FF00 = "green hex",
+    10       = "special",
 };
 ```
 
+Rules:
+
 * keys must be compile-time constants
-* values stored as a static `T[]`
-* all lookups lower to index-based access
+* keys are mapped to indices at compile time
+* values stored as static `T[]`
+
+Access:
+
+```c
+Colors["red"];     // compile-time lookup
+Colors::"red";    // index
+Colors![3];       // runtime index (panic)
+Colors?[3];       // runtime index (optional)
+```
 
 ---
 
-## Performance Model
+## Generic Constants (Minimal)
 
-The CMinus type system guarantees:
+Generic constants are **compile-time values used to configure types**.
 
-* no garbage collection
-* no hidden reference counting
-* no runtime reflection 
-* predictable lowering to C
+```c
+struct string<u32 Capacity = 256 -> Capacity > 32> { ... }
+```
+
+Properties:
+
+* must satisfy compile-time conditions
+* never exist at runtime
+* commonly used for capacities, limits, layout control
 
 ---
 
-## Non-Goals
+## Compile-Time Type Properties
 
-The type system intentionally does not provide:
+Available in compile-time contexts:
 
-* implicit memory management
-* runtime polymorphism
-* hidden lifetimes
-* automatic safety checks
+```c
+sizeof(T)
+alignof(T)
+nameof(T)
+typeof(expr)
+typeid(T)
 
-All such behavior must be explicitly requested and visible in code.
+minof(T)
+maxof(T)
+defaultof(T)
+lengthof(array)
+```
+
+All of these:
+
+* are evaluated at compile time
+* have no runtime cost
+* are forbidden in runtime-only contexts
